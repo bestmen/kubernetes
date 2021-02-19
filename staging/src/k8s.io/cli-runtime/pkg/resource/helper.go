@@ -146,6 +146,7 @@ func (m *Helper) CreateWithOptions(namespace string, modify bool, obj runtime.Ob
 	if m.FieldManager != "" {
 		options.FieldManager = m.FieldManager
 	}
+	// 不太懂为什么要清理客户端创建的资源的版本，重置的方式也比较奇怪，为什么不直接修改呢 TODO
 	if modify {
 		// Attempt to version the object based on client logic.
 		version, err := metadataAccessor.ResourceVersion(obj)
@@ -165,12 +166,12 @@ func (m *Helper) CreateWithOptions(namespace string, modify bool, obj runtime.Ob
 
 func (m *Helper) createResource(c RESTClient, resource, namespace string, obj runtime.Object, options *metav1.CreateOptions) (runtime.Object, error) {
 	return c.Post().
-		NamespaceIfScoped(namespace, m.NamespaceScoped).
-		Resource(resource).
-		VersionedParams(options, metav1.ParameterCodec).
-		Body(obj).
-		Do(context.TODO()).
-		Get()
+		NamespaceIfScoped(namespace, m.NamespaceScoped). // 设置namespace
+		Resource(resource). // set resource
+		VersionedParams(options, metav1.ParameterCodec). // set versioned params
+		Body(obj). // 序列化object，同时设置请求体
+		Do(context.TODO()). // 实际请求发出，并获得返回结果
+		Get() // 反序列化返回结果，构造object
 }
 func (m *Helper) Patch(namespace, name string, pt types.PatchType, data []byte, options *metav1.PatchOptions) (runtime.Object, error) {
 	if options == nil {

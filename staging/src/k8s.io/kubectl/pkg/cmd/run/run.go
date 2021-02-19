@@ -619,6 +619,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		return nil, err
 	}
 
+	// generator生成对象
 	// TODO: Validate flag usage against selected generator. More tricky since --expose was added.
 	obj, err := generator.Generate(params)
 	if err != nil {
@@ -638,7 +639,7 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	if err != nil {
 		return nil, err
 	}
-
+	// 外部可以注入修改
 	if len(overrides) > 0 {
 		codec := runtime.NewCodec(scheme.DefaultJSONEncoder(), scheme.Codecs.UniversalDecoder(scheme.Scheme.PrioritizedVersionsAllGroups()...))
 		obj, err = cmdutil.Merge(codec, obj, overrides)
@@ -652,10 +653,14 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 	}
 
 	actualObj := obj
+	// 这里有变化，区分了server和client dry run
 	if o.DryRunStrategy != cmdutil.DryRunClient {
+		// 不是空转，这里会发起HTTP请求
+		// 注解创建或更新 略过
 		if err := util.CreateOrUpdateAnnotation(cmdutil.GetFlagBool(cmd, cmdutil.ApplyAnnotationsFlag), obj, scheme.DefaultJSONEncoder()); err != nil {
 			return nil, err
 		}
+		// 客户端构建
 		client, err := f.ClientForMapping(mapping)
 		if err != nil {
 			return nil, err
@@ -667,8 +672,8 @@ func (o *RunOptions) createGeneratedObject(f cmdutil.Factory, cmd *cobra.Command
 		}
 		actualObj, err = resource.
 			NewHelper(client, mapping).
-			DryRun(o.DryRunStrategy == cmdutil.DryRunServer).
-			WithFieldManager(o.fieldManager).
+			DryRun(o.DryRunStrategy == cmdutil.DryRunServer). // 动态配置server side dry run
+			WithFieldManager(o.fieldManager). // 更新管理者
 			Create(o.Namespace, false, obj)
 		if err != nil {
 			return nil, err
